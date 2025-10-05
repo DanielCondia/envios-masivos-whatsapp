@@ -90,6 +90,25 @@ class WhatsappBulkSender {
         return cleaned;
     }
 
+    /**
+     * Valida y formatea un numero de celular colombiano
+     * @param phone numero de telefono a validar
+     * @returns {string|false} numero formateado o false si invalido
+     */
+    validateAndFormatPhone(phone) {
+        if (!phone || typeof phone !== 'string' || phone.trim() === '') return false;
+
+        let cleaned = phone.replace(/[\s\-+()]/g, '');
+
+        if (cleaned.startsWith('57') && cleaned.length === 12 && cleaned[2] === '3') {
+            return cleaned;
+        } else if (!cleaned.startsWith('57') && cleaned.length === 10 && cleaned[0] === '3') {
+            return '57' + cleaned;
+        }
+
+        return false;
+    }
+
     async sendBulkMessages(recipients, templateName, getTemplateParams) {
         this.stats.total = recipients.length;
         console.log(`📩 Iniciando env�o masivo a ${this.stats.total} destinatarios...`)
@@ -146,18 +165,26 @@ class WhatsappBulkSender {
             const lines = content.split('\n').filter(line => line.trim());
 
             const headers = lines[0].split(',').map(h => h.trim());
+            const telefonoIndex = headers.indexOf('TELEFONO');
+
+            if (telefonoIndex === -1) {
+                console.error('Error: Columna TELEFONO no encontrada en el CSV');
+                return [];
+            }
+
             const recipients = [];
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
-                const recipient = {};
-
-                headers.forEach((header, index) => {
-                    recipient[header] = values[index];
-                });
-                recipients.push(recipient);
+                if (values.length > telefonoIndex) {
+                    const phoneValue = values[telefonoIndex];
+                    const formattedPhone = this.validateAndFormatPhone(phoneValue);
+                    if (formattedPhone) {
+                        recipients.push({ phone: formattedPhone });
+                    }
+                }
             }
-            console.log(`📋 Cargados ${recipients.length} destinatarios desde ${filePath}`);
+            console.log(`📋 Cargados ${recipients.length} destinatarios válidos desde ${filePath}`);
             return recipients;
         } catch (error) {
             console.error(`Error al cargar destinatarios desde ${filePath}:`, error);

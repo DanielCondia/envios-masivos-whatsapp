@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const WhatsappBulkSender = require('./src/whatsapp-bulk-sender.js');
+const PATH_CSV = require('./data/FESAD a corte de 2025.xlsx - FESAD.csv');
 
 const config = {
     phoneNumberId: process.env.PHONE_NUMBER_ID,
@@ -20,11 +21,11 @@ async function main() {
     }
 
     // Example: Load recipients from CSV (assuming a file exists)
-    // const recipients = await sender.loadRecipientsFromCSV('./recipients.csv');
+    const recipients = await sender.loadRecipientsFromCSV(PATH_CSV);
     // Then send bulk
-    // const results = await sender.sendBulkMessages(recipients, 'template_name', (recipient) => [recipient.name]);
-    // sender.saveReport(results);
-    // sender.showSummary();
+    const results = await sender.sendBulkMessages(recipients, 'template_name', (recipient) => [recipient.name]);
+    await sender.saveReport(results);
+    sender.showSummary();
 
     console.log('Main file ready. Uncomment example code to test.');
 }
