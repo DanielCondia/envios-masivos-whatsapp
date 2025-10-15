@@ -30,7 +30,7 @@ class WhatsappBulkSender {
      * @param languageCode codigo de idioma
      * @returns {Promise<void>}
      */
-    async sendMessage(to, templateName, templateParams = [], languageCode = 'es') {
+    async sendMessage(to, templateName, templateParams = [], languageCode = 'en_US') {
         try {
             const payload = {
                 messaging_product: 'whatsapp',
@@ -239,7 +239,7 @@ class WhatsappBulkSender {
     async validateConnection() {
         try {
             const response = await axios.get(
-                this.baseUrl,
+                `https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${this.accessToken}`
