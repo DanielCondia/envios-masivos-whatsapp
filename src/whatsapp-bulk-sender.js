@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { log } = require("console");
 const fs = require("fs").promises;
 const path = require("path");
 
@@ -23,6 +24,29 @@ class WhatsappBulkSender {
     }
 
     /**
+     * Construye un componente de botones compatible con templates a partir de una lista simple.
+     * @param buttons Array de botones: [{ title: 'Aceptar' }, ...]
+     * @returns {object|null} componente para inyectar en payload.template.components o null si no aplica
+     */
+    buildButtonComponent(buttons) {
+        if (!Array.isArray(buttons) || buttons.length === 0) return null;
+
+        // Mapear a estructura simple que intentamos usar en templates
+        const mapped = buttons.map((b, idx) => ({
+            type: 'reply',
+            reply: {
+                id: `btn_${idx}`,
+                title: b.title || `Button ${idx + 1}`
+            }
+        }));
+
+        return {
+            type: 'button',
+            buttons: mapped
+        };
+    }
+
+    /**
      * Envia un mensaje a un destinatario individual
      * @param to numero de celular al que va a ir dirigido
      * @param templateName nombre del template de marketing que meta ya debio haber aceptado
@@ -30,7 +54,7 @@ class WhatsappBulkSender {
      * @param languageCode codigo de idioma
      * @returns {Promise<void>}
      */
-    async sendMessage(to, templateName, templateParams = [], languageCode = 'en_US') {
+    async sendMessage(to, templateName, templateParams = [], languageCode = 'es_CO', buttons = []) {
         try {
             const payload = {
                 messaging_product: 'whatsapp',
@@ -38,22 +62,37 @@ class WhatsappBulkSender {
                 type: 'template',
                 template: {
                     name: templateName,
-                    language: {code: languageCode},
+                    language: { code: languageCode },
                     components: []
                 }
             };
 
-            // Agregar parametros si existen
+            // Solo agregar components si hay variables
             if (templateParams.length > 0) {
-                payload.template.components.push({
-                    type: 'body',
-                    parameters: templateParams.map(param => ({
-                        type: 'text',
-                        text: param
-                    }))
+                const parameters = templateParams.map(param => {
+                    // soporte para string (posicional) o objeto { name, text }
+                    if (typeof param === 'string') {
+                        return { type: 'text', text: param, parameter_name: 'customer_name' };
+                    }
+                    return { type: 'text', text: String(param), parameter_name: 'customer_name' };
                 });
+
+                payload.template.components = [
+                    {
+                        type: 'body',
+                        parameters: parameters
+                    }
+                ];
             }
 
+            // Agregar componente de botones si se proporcionan (desacoplado a método)
+            const buttonComponent = this.buildButtonComponent(buttons);
+            if (buttonComponent) {
+                payload.template.components = payload.template.components || [];
+                payload.template.components.push(buttonComponent);
+            }
+
+            console.log('Payload => ', JSON.stringify(payload, null, 2));
             const response = await axios.post(this.baseUrl, payload, {
                 headers: {
                     'Authorization': `Bearer ${this.accessToken}`,
@@ -75,6 +114,8 @@ class WhatsappBulkSender {
         }
     }
 
+    
+
     /**
      * funcion encargada de hacer la limpieza del numero y verificar que tenga el codigo de colombia
      * @param phone phone number to be cleaned
@@ -82,11 +123,19 @@ class WhatsappBulkSender {
      */
     formatPhoneNumber(phone) {
         // limpiar phone
-        let cleaned = phone.replace(/[\s\-+()]/g, '');
+        let cleaned = String(phone).replace(/[\s\-+()]/g, '');
 
-        // si no tiene codigo de pais, agregar el de colombia +57 by default
-        if ((!cleaned.startsWith('57') || !cleaned.startsWith('+57')) || cleaned.length === 10)
-            cleaned = '57' + cleaned;
+        // Si ya tiene el código de país '57', devolver tal cual
+        if (cleaned.startsWith('57')) {
+            return cleaned;
+        }
+
+        // Si es un celular colombiano sin código (10 dígitos y comienza con 3), anteponer '57'
+        if (cleaned.length === 10 && cleaned[0] === '3') {
+            return '57' + cleaned;
+        }
+
+        // Para cualquier otro caso, devolver el valor limpio (sin signos)
         return cleaned;
     }
 
@@ -109,7 +158,7 @@ class WhatsappBulkSender {
         return false;
     }
 
-    async sendBulkMessages(recipients, templateName, getTemplateParams) {
+    async sendBulkMessages(recipients, templateName, getTemplateParams, buttons = []) {
         this.stats.total = recipients.length;
         console.log(`📩 Iniciando env�o masivo a ${this.stats.total} destinatarios...`)
         console.log(`⏱️  Tiempo estimado: ${Math.ceil(this.stats.total / this.maxMessagesPerSecond / 60)} minutos\n`);
@@ -127,7 +176,9 @@ class WhatsappBulkSender {
                 const result = await this.sendMessage(
                     recipient.phone,
                     templateName,
-                    params
+                    params,
+                    'es_CO',
+                    buttons
                 );
 
                 if (result?.success) {
@@ -215,7 +266,7 @@ class WhatsappBulkSender {
         if (this.stats.errors.length > 0) {
             console.log('❌ ERRORES DETALLADOS:');
             this.stats.errors.slice(0, 10).forEach(err => {
-                console.log(`  - ${err.phone}: ${JSON.stringify(err.error).substring(0, 100)}`);
+                console.log(`  - ${err.phone}: ${JSON.stringify(err.error).substring(0, 200)}`);
             });
             if (this.stats.errors.length > 10) {
                 console.log(`  ... y ${this.stats.errors.length - 10} errores más`);
