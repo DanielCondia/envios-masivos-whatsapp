@@ -23,16 +23,29 @@ async function main() {
     const recipients = await sender.loadRecipientsFromCSV(PATH_CSV);
     // console.log('recipients => ', recipients);
 
-    // Configura aquí el número de variables que tiene tu plantilla:
-    const NUM_TEMPLATE_VARIABLES = 1; // Ahora la plantilla tiene 2 variables: la original y customer_name
+    // Número de variables que tiene la plantilla:
+    const NUM_TEMPLATE_VARIABLES = 7;
     const CONTENT_BUTTONS = false;
 
     // Función dinámica para los parámetros del template
     const getTemplateParams = (recipient) => {
         if (NUM_TEMPLATE_VARIABLES === 0) return [];
-        // Retornamos un array con exactamente NUM_TEMPLATE_VARIABLES items.
-        // Enviamos ambos parámetros como strings posicionales en el orden esperado por la plantilla.
-        return ['{{customer_name}}'];
+        return [
+            {
+                typeTemplate: "header",
+                type: "document",
+                document: {
+                    link: 'https://drive.google.com/uc?export=download&id=1M2fyHJizB-6_sqPXuzvrttYIfW9jZWuS', // enlace público válido
+                    filename: 'Rendicion_de_Cuentas_FESAD.pdf'
+                }
+            },
+            {
+                typeTemplate: "body",
+                type: "text",
+                paramValue: "Customer Name",
+                paramName: 'name'
+            }
+        ];
     };
 
     // Botones de ejemplo (se enviarán a todos los destinatarios)
@@ -45,7 +58,7 @@ async function main() {
     }
 
     // Then send bulk
-    const results = await sender.sendBulkMessages(recipients, 'prueba_plantilla_mensajes', getTemplateParams, buttons);
+    const results = await sender.sendBulkMessages(recipients, 'rendicion_cuentas_camilo_test_documento', getTemplateParams, buttons);
     await sender.saveReport(results);
     sender.showSummary();
 

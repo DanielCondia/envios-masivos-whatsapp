@@ -54,7 +54,7 @@ class WhatsappBulkSender {
      * @param languageCode codigo de idioma
      * @returns {Promise<void>}
      */
-    async sendMessage(to, templateName, templateParams = [], languageCode = 'es_CO', buttons = []) {
+    async sendMessage(to, templateName, templateParams = [], languageCode = 'en_US', buttons = []) {
         try {
             const payload = {
                 messaging_product: 'whatsapp',
@@ -67,23 +67,8 @@ class WhatsappBulkSender {
                 }
             };
 
-            // Solo agregar components si hay variables
-            if (templateParams.length > 0) {
-                const parameters = templateParams.map(param => {
-                    // soporte para string (posicional) o objeto { name, text }
-                    if (typeof param === 'string') {
-                        return { type: 'text', text: param, parameter_name: 'customer_name' };
-                    }
-                    return { type: 'text', text: String(param), parameter_name: 'customer_name' };
-                });
-
-                payload.template.components = [
-                    {
-                        type: 'body',
-                        parameters: parameters
-                    }
-                ];
-            }
+            this.addHeaderParams(templateParams, payload);
+            this.addBodyParams(templateParams, payload);
 
             // Agregar componente de botones si se proporcionan (desacoplado a método)
             const buttonComponent = this.buildButtonComponent(buttons);
@@ -114,7 +99,57 @@ class WhatsappBulkSender {
         }
     }
 
-    
+    /**
+     * function handle add header params
+     * @param {*} templateParams 
+     * @param {*} payload 
+     */
+    addHeaderParams(templateParams, payload) {
+        if (templateParams.length > 0) {
+            const parameters = templateParams
+            .filter(param => param.typeTemplate === "header")
+            .map(param => {
+                return {
+                    type: param.type,
+                    document: param.document
+                }
+            });
+            payload.template.components.push(
+                {
+                    type: "header",
+                    parameters: parameters
+                }
+            );
+        }
+    }
+
+    /**
+     * function handle add body params
+     * 
+     * @param {*} templateParams 
+     * @param {*} payload 
+     */
+    addBodyParams(templateParams, payload) {
+        // Solo agregar components si hay variables
+        if (templateParams.length > 0) {
+            const parameters = templateParams
+            .filter(param => param.typeTemplate === "body")
+            .map(param => {
+                if (typeof param === 'string') {
+                    return { type: param.type, text: param.paramValue, parameter_name: param.paramName };
+                }
+                return { type: param.type, text: String(param.paramValue), parameter_name: param.paramName };
+            });
+
+            payload.template.components.push(
+                {
+                    type: 'body',
+                    parameters: parameters
+                }
+            );
+        }
+    }
+
 
     /**
      * funcion encargada de hacer la limpieza del numero y verificar que tenga el codigo de colombia
@@ -259,8 +294,8 @@ class WhatsappBulkSender {
         console.log('📊 RESUMEN DE ENVÍO');
         console.log('='.repeat(50));
         console.log(`Total de mensajes: ${this.stats.total}`);
-        console.log(`✅ Enviados exitosamente: ${this.stats.sent} (${((this.stats.sent/this.stats.total)*100).toFixed(2)}%)`);
-        console.log(`❌ Fallidos: ${this.stats.failed} (${((this.stats.failed/this.stats.total)*100).toFixed(2)}%)`);
+        console.log(`✅ Enviados exitosamente: ${this.stats.sent} (${((this.stats.sent / this.stats.total) * 100).toFixed(2)}%)`);
+        console.log(`❌ Fallidos: ${this.stats.failed} (${((this.stats.failed / this.stats.total) * 100).toFixed(2)}%)`);
         console.log('='.repeat(50) + '\n');
 
         if (this.stats.errors.length > 0) {
