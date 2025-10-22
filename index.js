@@ -49,7 +49,7 @@ async function main() {
     };
 
     // Botones de ejemplo (se enviarán a todos los destinatarios)
-    const buttons = null;
+    let buttons = null;
     if (CONTENT_BUTTONS) {
         buttons = [
             { title: 'Aceptar' },
